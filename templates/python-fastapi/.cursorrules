@@ -1,0 +1,47 @@
+# .cursorrules — Python + FastAPI
+# Kept in sync with CLAUDE.md. These rules override default Cursor behavior.
+
+You are working in a Python 3.12+ + FastAPI + Pydantic v2 project. uv manages the venv; ruff formats/lints; mypy (or pyright) type-checks.
+
+## Scope discipline
+- Change only what the task requires. Do NOT refactor, rename, or reformat unrelated code.
+- Do NOT add a new dependency, pattern, or abstraction without asking. Prefer what the codebase already uses.
+- No speculative generality — build for the current requirement only (YAGNI).
+
+## Typing
+- Type EVERY function signature (params + return). Run mypy/pyright strict.
+- NEVER use bare `Any` to escape a type error — narrow with cast/TypeGuard or a proper model.
+- Modern syntax: `str | None`, `list[str]` — not Optional/List.
+
+## Async (the #1 FastAPI failure mode)
+- NEVER call a blocking function inside `async def` (no requests, sync DB driver, time.sleep, blocking file I/O) — one blocking call freezes the whole event loop and stalls ALL concurrent requests.
+- Use async libs (httpx.AsyncClient, async DB driver). Unavoidable blocking call → run_in_threadpool / asyncio.to_thread.
+- If a path operation does no await, make it `def` (FastAPI runs it in a threadpool) — declaring it async then blocking is the trap.
+
+## Models & validation
+- Define Pydantic v2 models for every request AND response body. Validate at the edge — never accept a raw dict.
+- Use response_model= so internal fields (hashes, internal ids) never leak. Don't return the ORM object directly.
+- Settings via pydantic-settings, loaded once and validated at startup; fail fast on missing/malformed env vars.
+
+## Architecture
+- Thin path operations: validate → call a service → return. Business logic in services; data access behind a repository.
+- Use Depends for auth/DB sessions/shared setup — not globals. Group by feature, not by file type.
+
+## Error handling
+- Raise HTTPException (or a mapped custom exception) with the correct status code. Never return an error body with a 200.
+- NEVER swallow exceptions with bare `except:` / `except Exception: pass`. Catch specific exceptions; re-raise or log with context.
+- NEVER leak internals — log the full traceback server-side, return a safe message.
+
+## Security
+- No hardcoded secrets (committed secrets leak permanently via git history).
+- Parameterize every DB query — bound params only, never f-strings/%-formatting in SQL.
+- Explicit CORS allowlist (never "*" with credentials). Rate-limit public/auth endpoints.
+
+## Observability & style
+- Use logging/structlog with levels. NO print() in committed code.
+- Immutable by default; NO mutable default arguments (def f(x=[])). Early returns over deep nesting (max ~3). Named constants over magic numbers.
+- PEP 8 (ruff). Functions < ~50 lines, files < ~400 (hard cap 800). No commented-out code or context-free TODOs.
+
+## Testing & done
+- pytest; test endpoints via httpx.AsyncClient/TestClient with AAA. Cover error paths (422/401/downstream), not just happy path. Use app.dependency_overrides to inject fakes.
+- Before declaring done: `uv run mypy .`, `uv run ruff check .`, and `uv run pytest` pass. No blocking calls in async def; sync handlers are def; no bare Any/except, no hardcoded secrets, no print, no leaked internals. Diff contains only the required change.

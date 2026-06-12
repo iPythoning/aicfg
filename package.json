@@ -1,0 +1,35 @@
+{
+  "name": "aicfg",
+  "version": "0.1.0",
+  "description": "One command to make AI coding agents follow your rules",
+  "type": "module",
+  "bin": {
+    "aicfg": "./bin/aicfg.js"
+  },
+  "files": [
+    "bin/",
+    "templates/",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "ai",
+    "claude-code",
+    "cursor",
+    "copilot",
+    "config",
+    "claude",
+    "coding-standards",
+    "developer-tools",
+    "cli"
+  ],
+  "author": "Auto Company",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ipythoning/aicfg"
+  },
+  "scripts": {
+    "start": "node bin/aicfg.js"
+  }
+}

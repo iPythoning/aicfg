@@ -1,0 +1,46 @@
+# .cursorrules — Go
+# Kept in sync with CLAUDE.md. These rules override default Cursor behavior.
+
+You are working in a Go (latest stable) project. Standard library first; modules via go.mod.
+
+## Scope discipline
+- Change only what the task requires. Do NOT refactor, rename, or reformat unrelated code.
+- Prefer the standard library; ask before adding a dependency — every module is a supply-chain + maintenance cost.
+- No speculative generality (YAGNI). No interfaces/generics "for flexibility" before two real implementations exist.
+
+## Errors (Go's core discipline)
+- Check EVERY returned error. Never discard with `_` unless justified in a comment.
+- Wrap with context: fmt.Errorf("...: %w", err) — a bare `return err` loses the call path.
+- Compare with errors.Is/errors.As, NEVER by string matching.
+- Do NOT panic for ordinary/expected errors — return them. Reserve panic for unrecoverable programmer bugs.
+
+## Concurrency (the #1 Go production failure mode)
+- Every goroutine needs a defined exit path — never start one you can't stop. Tie its lifetime to a context and select on ctx.Done(). A goroutine blocked forever is a memory leak.
+- context.Context is the FIRST parameter of any function that does I/O, blocks, or spawns goroutines. Propagate it; respect cancellation; never store it in a struct.
+- Guard all shared mutable state (mutex) or confine to one goroutine + channels. Run `go test -race`.
+- Use errgroup/sync.WaitGroup to wait for goroutines; don't fire-and-forget.
+
+## API & types
+- Accept interfaces, return concrete structs.
+- Keep interfaces small and define them where consumed, not where implemented.
+- Useful zero values where practical. Doc comments on exported identifiers, starting with the name. Minimal exported surface.
+
+## Dependencies, state, resources
+- NO global mutable state — inject dependencies via constructors. Globals make code untestable and create hidden coupling.
+- Keep main thin: wire deps, start server, handle shutdown. Logic lives in packages.
+- defer Close() every opened resource (files, rows, response bodies, conns) right after checking the open error.
+- Handle SIGTERM/SIGINT: cancel root context, drain with a timeout, exit.
+
+## Security
+- No hardcoded secrets (env only; committed secrets leak permanently via git history).
+- database/sql placeholders ($1/?), NEVER fmt.Sprintf/concatenation for SQL.
+- Validate + bound all external input. Set timeouts on every HTTP client and server (ReadTimeout/WriteTimeout) — a missing timeout is a hang/DoS.
+
+## Code style
+- gofmt/goimports always. Pass go vet and (if configured) staticcheck/golangci-lint clean.
+- Early returns; keep the happy path un-indented. Short names in short scopes, descriptive exported names, no stutter.
+- No commented-out code or context-free TODOs.
+
+## Testing & done
+- Table-driven tests with t.Run subtests; t.Parallel() where independent; always run with -race. Cover error paths (bad input, cancelled context, downstream failure). Prefer stdlib `testing`.
+- Before declaring done: `go build ./...`, `go vet ./...`, `gofmt -l .` (empty), and `go test -race ./...` pass. Every error checked; every goroutine has an exit path; every resource defer-closed; no global mutable state, no hardcoded secrets, no string-built SQL, no panics for ordinary errors. Diff contains only the required change.

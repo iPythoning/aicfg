@@ -1,0 +1,45 @@
+# .cursorrules — Next.js + TypeScript
+# Kept in sync with CLAUDE.md. These rules override default Cursor behavior.
+
+You are working in a Next.js (App Router) + React 19 + TypeScript (strict) project. npm is the package manager.
+
+## Scope discipline
+- Change only what the task requires. Do NOT refactor, rename, or reformat unrelated code.
+- Do NOT add a new dependency, pattern, or abstraction without asking. Prefer what the codebase already uses.
+- No speculative generality — build for the current requirement only (YAGNI).
+
+## TypeScript
+- strict mode. NEVER use `any` — use `unknown` and narrow. `any` disables the type system where bugs hide.
+- Prefer `type` for unions/objects; `interface` only for declaration merging.
+- PascalCase type names, no `I` prefix.
+- Derive types from one source of truth (z.infer, ReturnType, `as const`) — never maintain parallel shapes by hand.
+
+## React / Next.js
+- Server Components by default. Add "use client" ONLY for state, effects, or browser APIs — unused client JS is the #1 Next.js perf regression.
+- Fetch data in Server Components or route handlers, NOT in useEffect (useEffect fetching causes waterfalls and loading-flash).
+- PascalCase components, useCamelCase hooks, one component per file.
+- Co-locate by feature, not by file type.
+- Keep server-only secrets out of any module a Client Component imports (use `server-only`).
+
+## State
+- Server data: RSC or TanStack Query. Shared client state: a small store, only when prop-passing hurts. URL state: search params. Forms: React Hook Form + schema validation.
+- NEVER copy server data into a client store — derive, don't duplicate.
+
+## Error handling
+- Handle errors explicitly at every boundary. NEVER swallow them with empty catch blocks.
+- Validate all external input (form data, params, API responses) with a schema at the edge.
+- User surfaces show friendly messages; the server logs full context.
+
+## Code style
+- Immutable by default — return new objects, don't mutate inputs.
+- Early returns over deep nesting (max ~3 levels). Named constants over magic numbers.
+- Functions < ~50 lines, files < ~400 (hard cap 800).
+- No console.log, commented-out code, or context-free TODOs in committed code.
+
+## Security
+- No hardcoded secrets (env vars; validate at startup). No unsanitized HTML / raw dangerouslySetInnerHTML.
+- Parameterize every DB query. CSRF + rate limiting on state-changing routes.
+
+## Testing & done
+- New logic ships with AAA tests covering edge cases. Descriptive test names.
+- Before declaring done: `npm run build`, `npm run lint`, and tests must pass. No `any`, no swallowed errors, no hardcoded secrets, no stray console.log. Diff contains only the required change.
