@@ -32,13 +32,14 @@ const USDC_TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a1162
 
 // ---- Content Registry ----
 // Map resource paths to file paths or static content
+const STACKS_DIR = join(__dirname, 'stacks');
 const CONTENT = {
-  '/stacks/monorepo': { file: 'stacks/monorepo.zip', name: 'Monorepo Stack', size: '12KB' },
-  '/stacks/microservices': { file: 'stacks/microservices.zip', name: 'Microservices Stack', size: '14KB' },
-  '/stacks/fullstack-nextjs': { file: 'stacks/fullstack-nextjs.zip', name: 'Fullstack Next.js Stack', size: '18KB' },
-  '/stacks/enterprise-python': { file: 'stacks/enterprise-python.zip', name: 'Enterprise Python Stack', size: '16KB' },
-  '/stacks/team-sharing': { file: 'stacks/team-sharing.zip', name: 'Team Sharing Stack', size: '10KB' },
-  '/stacks/ci-cd-integration': { file: 'stacks/ci-cd-integration.zip', name: 'CI/CD Integration Stack', size: '11KB' },
+  '/stacks/monorepo': { file: 'stacks/monorepo.zip', name: 'Monorepo Stack', size: '2.0KB' },
+  '/stacks/microservices': { file: 'stacks/microservices.zip', name: 'Microservices Stack', size: '2.4KB' },
+  '/stacks/fullstack-nextjs': { file: 'stacks/fullstack-nextjs.zip', name: 'Fullstack Next.js Stack', size: '3.3KB' },
+  '/stacks/enterprise-python': { file: 'stacks/enterprise-python.zip', name: 'Enterprise Python Stack', size: '3.1KB' },
+  '/stacks/team-sharing': { file: 'stacks/team-sharing.zip', name: 'Team Sharing Stack', size: '2.4KB' },
+  '/stacks/ci-cd-integration': { file: 'stacks/ci-cd-integration.zip', name: 'CI/CD Integration Stack', size: '2.5KB' },
 };
 
 // ---- x402 Response Helpers ----
@@ -83,9 +84,27 @@ function successResponse(path, content) {
       success: true,
       resource: path,
       content: content || { message: 'Premium content unlocked' },
-      downloadUrl: `https://github.com/ipythoning/aicfg-pro/releases/latest/download/${path.split('/').pop()}.zip`,
+      downloadUrl: `https://github.com/ipythoning/aicfg/releases/latest/download/${path.split('/').pop()}.zip`,
     }, null, 2),
   };
+}
+
+async function serveZipFile(res, content) {
+  const filePath = join(STACKS_DIR, content.file);
+  try {
+    const data = await readFile(filePath);
+    const headers = {
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${content.file}"`,
+      'Content-Length': String(data.length),
+      'X-Payment-Status': 'verified',
+    };
+    res.writeHead(200, headers);
+    res.end(data);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ---- On-Chain Verification ----
@@ -197,10 +216,13 @@ async function handleRequest(req, res) {
     return;
   }
 
-  // Payment verified — serve content
-  const resp = successResponse(path, { name: content.name, size: content.size });
-  res.writeHead(resp.status, resp.headers);
-  res.end(resp.body);
+  // Payment verified — serve zip file (or JSON if zip not found)
+  const zipServed = await serveZipFile(res, content);
+  if (!zipServed) {
+    const resp = successResponse(path, { name: content.name, size: content.size });
+    res.writeHead(resp.status, resp.headers);
+    res.end(resp.body);
+  }
 
   console.log(`✓ Payment verified for ${path} — tx: ${txHash.slice(0, 10)}...`);
 }

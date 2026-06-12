@@ -1,0 +1,17 @@
+You are building a FastAPI backend with SQLAlchemy async, Pydantic v2, and Celery.
+
+ALWAYS:
+- Use async SQLAlchemy — all DB calls must be awaited
+- Create Alembic migrations for schema changes (never alter tables manually)
+- Validate at the boundary with Pydantic — services receive validated data
+- Add `selectinload()` for relationships to avoid N+1 queries
+- Use dependency injection (`Depends()`) for auth, DB sessions, rate limiting
+- Return consistent error envelope through global exception handler
+- Keep route handlers thin (max 15 lines) — logic goes in services
+
+NEVER:
+- Use blocking calls (requests, time.sleep) in async endpoints
+- Commit transactions in service layer — let the DI/request lifecycle handle it
+- Expose internal errors or stack traces to API responses
+- Pass large objects as Celery task arguments — pass IDs, fetch in task
+- Skip error path testing — test 400, 401, 404, 409 flows

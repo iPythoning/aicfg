@@ -1,6 +1,6 @@
 {
   "name": "aicfg",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "One command to make AI coding agents follow your rules",
   "type": "module",
   "bin": {
@@ -9,6 +9,7 @@
   "files": [
     "bin/",
     "templates/",
+    "premium/",
     "README.md",
     "LICENSE"
   ],

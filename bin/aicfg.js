@@ -4,7 +4,9 @@ import { join, dirname, relative, basename, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const TEMPLATES = join(__dirname, '..', 'templates');
+const ROOT = join(__dirname, '..');
+const TEMPLATES = join(ROOT, 'templates');
+const PREMIUM_DIR = join(ROOT, 'premium');
 
 const STACK_DETECT = [
   { file: 'next.config.js', config: 'nextjs-typescript' },
@@ -23,17 +25,16 @@ const STACK_DETECT = [
 const HELP = `aicfg — one command to make AI coding agents follow your rules
 
 Usage:
-  aicfg init     Generate optimal AI agent config for this project
-  aicfg pack     Bundle codebase context for AI (filtered, token-aware)
-  aicfg check    Audit existing AI agent config for completeness
-  aicfg pro      Premium config stacks — pay with USDC
+  aicfg init                        Generate optimal AI agent config for this project
+  aicfg pack                        Bundle codebase context for AI (filtered, token-aware)
+  aicfg check                       Audit existing AI agent config for completeness
+  aicfg pro                         View premium stacks and pricing
+  aicfg pro --unlock <stack> --tx <hash>  Verify payment and install premium stack
 
 Examples:
-  npx aicfg init              # Auto-detect stack, generate config
-  npx aicfg pack > ctx        # Save context to file
-  npx aicfg check             # Check CLAUDE.md quality
-  npx aicfg pro               # View premium stacks & pricing
-  npx aicfg pro --claim 0x... # Verify payment, unlock premium
+  npx aicfg init                              # Auto-detect stack, generate config
+  npx aicfg pro                               # View premium catalog with pricing
+  npx aicfg pro --unlock monorepo --tx 0x...  # Pay 10 USDC, then install monorepo stack
 
 Install: npm install -g github:ipythoning/aicfg
 GitHub:   https://github.com/ipythoning/aicfg`;
@@ -62,7 +63,7 @@ async function main() {
     case 'check': return await checkCmd();
     case 'pro': return await proCmd();
     case '--help': case '-h': case undefined: console.log(HELP); break;
-    case '--version': case '-v': console.log('aicfg v0.1.0'); break;
+    case '--version': case '-v': console.log('aicfg v0.3.0'); break;
     default: console.error(`Unknown command: ${cmd}\nRun aicfg --help`); process.exit(1);
   }
 }
@@ -176,17 +177,22 @@ async function checkCmd() {
   }
 }
 
-async function proCmd() {
-  const arg = process.argv[3];
+// === Premium (Pro) Commands ===
 
-  if (arg === '--claim') {
-    const txHash = process.argv[4];
-    if (!txHash) {
-      console.error('Usage: aicfg pro --claim <transaction-hash>');
-      console.error('Send USDC first, then verify with your transaction hash.');
+async function proCmd() {
+  const args = process.argv.slice(3);
+  const unlockIdx = args.indexOf('--unlock');
+  const txIdx = args.indexOf('--tx');
+
+  if (unlockIdx !== -1 && txIdx !== -1) {
+    const stackName = args[unlockIdx + 1];
+    const txHash = args[txIdx + 1];
+    if (!stackName || !txHash) {
+      console.error('Usage: aicfg pro --unlock <stack-name> --tx <transaction-hash>');
+      console.error('Available stacks: ' + PREMIUM_STACKS.map(s => s.name).join(', '));
       process.exit(1);
     }
-    return await claimPremium(txHash);
+    return await unlockPremium(stackName, txHash);
   }
 
   // Show premium catalog
@@ -196,28 +202,46 @@ async function proCmd() {
   for (const s of PREMIUM_STACKS) {
     console.log(`  ${s.name.padEnd(24)} ${s.description}`);
   }
-  console.log(`\nTo purchase:`);
+  console.log(`\nTo purchase and install a stack:`);
   console.log(`  1. Send exactly ${PRO_PRICE_USDC} USDC to:`);
   console.log(`     ${PRO_WALLET}`);
   console.log(`  2. Copy the transaction hash from your wallet`);
-  console.log(`  3. Run: aicfg pro --claim <transaction-hash>`);
+  console.log(`  3. Run: aicfg pro --unlock <stack> --tx <transaction-hash>`);
+  console.log(`\n  Example: aicfg pro --unlock monorepo --tx 0xabc123...`);
   console.log(`\nNetwork: Arbitrum (USDC: ${PRO_USDC_ADDRESS})`);
   console.log(`Explorer: https://arbiscan.io/address/${PRO_WALLET}`);
 }
 
-async function claimPremium(txHash) {
+async function unlockPremium(stackName, txHash) {
+  const stack = PREMIUM_STACKS.find(s => s.name === stackName);
+  if (!stack) {
+    console.error(`Unknown stack: ${stackName}`);
+    console.error('Available: ' + PREMIUM_STACKS.map(s => s.name).join(', '));
+    process.exit(1);
+  }
+
+  const premiumPath = join(PREMIUM_DIR, stackName);
+  if (!(await fileExists(premiumPath))) {
+    console.error(`Stack "${stackName}" is not yet available locally.`);
+    console.error('Make sure you have the latest version: npm install -g github:ipythoning/aicfg');
+    process.exit(1);
+  }
+
   console.log(`Verifying transaction ${txHash.slice(0, 10)}...`);
 
   try {
     const verified = await verifyUsdcPayment(txHash, PRO_PRICE_USDC);
     if (verified) {
-      console.log('✓ Payment verified! Unlocking premium stacks...\n');
-      console.log('Download links (valid for this session):\n');
-      for (const s of PREMIUM_STACKS) {
-        console.log(`  ${s.name.padEnd(24)} https://github.com/ipythoning/aicfg-pro/releases/latest/download/${s.name}.zip`);
-      }
-      console.log('\n💡 Premium stacks are shipped as zip archives.');
-      console.log('   Extract into your project and run aicfg init to apply.');
+      console.log('✓ Payment verified! Installing premium stack...\n');
+
+      const cwd = process.cwd();
+      const files = await copyDir(premiumPath, cwd);
+
+      console.log(`✓ Installed "${stackName}" premium stack (${files.length} files):`);
+      for (const f of files) console.log(`  - ${f}`);
+
+      console.log(`\n💡 Review the generated CLAUDE.md and .cursorrules.`);
+      console.log(`   Run "aicfg check" to audit the config.`);
     } else {
       console.log('✗ Payment not found. Please check:');
       console.log('  1. Transaction hash is correct');
@@ -232,7 +256,6 @@ async function claimPremium(txHash) {
 }
 
 async function verifyUsdcPayment(txHash, minAmount) {
-  // Fetch transaction receipt to verify it's a USDC transfer to our wallet
   const resp = await fetch(PRO_RPC, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -248,23 +271,23 @@ async function verifyUsdcPayment(txHash, minAmount) {
   if (!data.result) return false;
 
   const receipt = data.result;
-  if (receipt.status !== '0x1') return false; // transaction failed
+  if (receipt.status !== '0x1') return false;
 
-  // Check logs for USDC Transfer event to our wallet
   const paddedWallet = '0x' + PRO_WALLET.slice(2).toLowerCase().padStart(64, '0');
   for (const log of receipt.logs) {
     if (log.address.toLowerCase() !== PRO_USDC_ADDRESS.toLowerCase()) continue;
     if (log.topics[0] !== USDC_TRANSFER_TOPIC) continue;
-    // topics[2] is the recipient (destination address in Transfer event)
     if (log.topics[2] && log.topics[2].toLowerCase() === paddedWallet.toLowerCase()) {
       const value = BigInt(log.data);
-      const minWei = BigInt(Math.floor(minAmount * 1e6)); // USDC has 6 decimals
+      const minWei = BigInt(Math.floor(minAmount * 1e6));
       return value >= minWei;
     }
   }
 
   return false;
 }
+
+// === Shared Utilities ===
 
 async function detectStack(cwd) {
   const arg = process.argv[3];

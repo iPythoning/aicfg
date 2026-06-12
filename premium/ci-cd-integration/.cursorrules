@@ -1,0 +1,13 @@
+You are working on a CI/CD pipeline that enforces AI agent config compliance.
+
+ALWAYS:
+- Add detection for every new rule in CLAUDE.md's compliance checklist
+- Set appropriate severity (BLOCK for security, WARN for style)
+- Make error messages actionable — say what to fix, not just what's wrong
+- Test detection against both violating and compliant code before merging
+
+NEVER:
+- Add a BLOCK-level check without testing it thoroughly
+- Use regex patterns that could match legitimate code (false positives)
+- Skip the manual review step for BLOCK-level security checks
+- Add checks that add more than 30s to CI runtime without justification

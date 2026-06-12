@@ -1,0 +1,13 @@
+You are working in a Turborepo monorepo. Packages are in packages/*.
+
+ALWAYS:
+- Run turbo commands, not package-level commands, for builds
+- Check package.json "exports" field before importing from another package
+- Create a changeset after modifying a published package
+- Run `tsc --noEmit` repo-wide after changing packages/shared/
+
+NEVER:
+- Import from forbidden package dependencies (see CLAUDE.md package boundaries)
+- Create circular dependencies between packages
+- Edit shared types without checking all consumers compile
+- Commit without verifying turbo build passes
