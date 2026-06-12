@@ -1,4 +1,4 @@
-# CLAUDE.md — Team Config Sharing
+# AGENTS.md — Team Config Sharing
 
 ## Overview
 

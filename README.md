@@ -1,28 +1,21 @@
-# aicfg
+# aicfg — AGENTS.md Ecosystem Tool
 
-**One command to make AI coding agents follow your rules.**
+**Manage AI agent configuration across 20+ coding tools. One command.**
 
 ```bash
-# Install (choose one):
-npm install -g github:ipythoning/aicfg    # GitHub (always works)
+npm install -g github:ipythoning/aicfg    # Install globally
 npx aicfg init                            # No install needed
-
-# Use:
-aicfg init     # Auto-detect stack, generate optimal AI agent config
-aicfg pack     # Bundle codebase context for AI
-aicfg check    # Audit existing AI agent config
-aicfg pro      # Premium config stacks (USDC payment)
 ```
 
-## The Problem
+## Why AGENTS.md?
 
-Every developer using AI coding tools (Claude Code, Cursor, Copilot) hits the same wall: AI doesn't follow your team's conventions. One day it uses your naming patterns. The next day it invents new ones. The third day it refactors code you didn't ask it to touch.
+[AGENTS.md](https://agents.md) is the **open standard** for AI agent configuration, stewarded by the Linux Foundation. It's supported by Claude Code, Cursor, GitHub Copilot, OpenAI Codex, Gemini CLI, Windsurf, Devin, Aider, and 15+ other AI coding tools.
 
-The problem isn't the model — it's that you haven't given it the right rules.
+**The problem**: Every AI coding tool has its own config format (CLAUDE.md, .cursorrules, copilot-instructions.md, GEMINI.md). Maintaining all of them is a nightmare — stale rules, contradictory instructions, copy-paste drift.
 
-## The Solution
+**The solution**: AGENTS.md as the **single source of truth**. Tool-specific files become 3-line shims that point to it. Edit once, apply everywhere.
 
-`aicfg init` auto-detects your tech stack and generates production-grade AI agent configuration — not "use TypeScript, write clean code" shallow instructions, but complete rule sets covering naming, immutability, error handling, security, and testing standards. Each rule includes a one-line explanation of *why* — because AI follows rules it understands, and ignores rules it doesn't.
+Research from Princeton shows AGENTS.md reduces agent runtime by 28.6% and token usage by 16.6%. 60,000+ GitHub repos already use it.
 
 ## Quick Start
 
@@ -30,75 +23,98 @@ The problem isn't the model — it's that you haven't given it the right rules.
 npx aicfg init
 ```
 
-That's it. Review the generated files, customize as needed, commit.
+Detects your stack, generates AGENTS.md + shim files (CLAUDE.md, .cursorrules, GEMINI.md). 10 stacks supported.
 
 ## Commands
 
 ### `aicfg init [stack]`
 
-Detects your project stack and generates:
-- `CLAUDE.md` — comprehensive rules for Claude Code
-- `.cursorrules` — matching rules for Cursor  
-- `README.md` — project documentation template
-
-Auto-detected stacks: Next.js, Node.js/Express, Python/FastAPI, Go
+Generate AGENTS.md + tool-specific shims:
 
 ```bash
-aicfg init              # Auto-detect
-aicfg init go           # Explicit stack
+aicfg init                  # Auto-detect stack
+aicfg init go               # Explicit stack
+aicfg init --no-shims       # Only AGENTS.md, skip shims
+```
+
+**10 stacks**: go, rust, node-express, nextjs-typescript, python-fastapi, monorepo, microservices, fullstack-nextjs, enterprise-python, ci-cd-integration, team-sharing
+
+Generates:
+- `AGENTS.md` — complete agent rules (single source of truth)
+- `CLAUDE.md` — shim → "Read AGENTS.md"
+- `.cursorrules` — shim → "Read AGENTS.md"
+- `GEMINI.md` — shim → "Read AGENTS.md"
+- `.github/copilot-instructions.md` — shim → "Read AGENTS.md"
+
+### `aicfg shim`
+
+Generate shim files from an existing AGENTS.md:
+
+```bash
+aicfg shim
+```
+
+Creates any missing shim files. Safe to run on existing projects — won't overwrite.
+
+### `aicfg validate`
+
+Check AGENTS.md quality against best practices:
+
+```bash
+aicfg validate
+```
+
+Checks for: project overview, build commands, coding style, scope boundaries, error handling, testing, security, git workflow, and adequate length.
+
+### `aicfg check`
+
+Full config audit — AGENTS.md + all shim files:
+
+```bash
+aicfg check
 ```
 
 ### `aicfg pack`
 
-Bundles your codebase context into a single file for AI consumption. Respects `.gitignore`, skips binaries, formats with code fences.
+Bundle codebase context for AI consumption:
 
 ```bash
 aicfg pack > context.md
 aicfg pack | pbcopy     # macOS clipboard
 ```
 
-### `aicfg check`
+## The Shim Pattern
 
-Audits your existing AI agent config for completeness. Checks: coding style rules, error handling, testing requirements, security rules, git workflow, and more.
+AGENTS.md is your **single source of truth** — the only file you edit. All tool-specific files are auto-generated shims:
 
-```bash
-aicfg check
 ```
+AGENTS.md          ← You edit this (full agent instructions)
+CLAUDE.md          ← Shim: "Read AGENTS.md"
+.cursorrules       ← Shim: "Read AGENTS.md"
+GEMINI.md          ← Shim: "Read AGENTS.md"
+copilot-instructions.md ← Shim: "Read AGENTS.md"
+```
+
+When you change your rules, edit AGENTS.md. The shims never go stale.
 
 ## Supported AI Tools
 
-- **Claude Code** (`CLAUDE.md`)
-- **Cursor** (`.cursorrules`)
-- **GitHub Copilot** (`.github/copilot-instructions.md` — coming soon)
+| Tool | Shim File |
+|------|-----------|
+| Claude Code | `CLAUDE.md` |
+| Cursor | `.cursorrules` |
+| GitHub Copilot | `.github/copilot-instructions.md` |
+| OpenAI Codex | `AGENTS.md` (native) |
+| Gemini CLI | `GEMINI.md` |
+| Windsurf | `AGENTS.md` (native) |
+| Devin | `AGENTS.md` (native) |
+| Aider | `AGENTS.md` (native) |
+| JetBrains AI | `AGENTS.md` (native) |
 
-## aicfg Pro
+## Built by AI Agents
 
-Free tier covers 4 stacks with basic rules. Pro unlocks 6 premium stacks:
-
-| Stack | What You Get |
-|-------|-------------|
-| `monorepo` | Turborepo/Nx multi-package shared config |
-| `microservices` | Service-level rules, shared contracts |
-| `fullstack-nextjs` | Next.js + API routes + DB + Auth |
-| `enterprise-python` | FastAPI + SQLAlchemy + Alembic + Redis + Docker |
-| `team-sharing` | Shared config repo for team consistency |
-| `ci-cd-integration` | Automated config compliance in PRs |
-
-**Price: 10 USDC per stack** (Arbitrum network)
-
-```bash
-aicfg pro                                              # View catalog & payment address
-aicfg pro --unlock monorepo --tx 0x...                 # Verify on-chain payment, install locally
-```
-
-No signup. No API keys. No email. Just send USDC, verify on-chain, and the premium config is extracted directly to your project.
-
-No signup. No API keys. No email. Just send USDC and verify on-chain.
-
-## Self-Hosting
-
-aicfg is built by AI agents, for AI agents. It configured itself using `aicfg init` — [check our CLAUDE.md](CLAUDE.md) to see the output.
+aicfg configures itself using `aicfg init` — [check our AGENTS.md](AGENTS.md) to see the output. Dogfooding at its finest.
 
 ## License
 
-MIT — free forever for the core commands.
+MIT — free forever. AGENTS.md is the standard. Tooling around it should be free too.

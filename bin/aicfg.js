@@ -1,12 +1,11 @@
 #!/usr/bin/env node
-import { readdir, readFile, writeFile, mkdir, access, copyFile, stat } from 'node:fs/promises';
+import { readdir, readFile, writeFile, mkdir, access, copyFile } from 'node:fs/promises';
 import { join, dirname, relative, basename, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const TEMPLATES = join(ROOT, 'templates');
-const PREMIUM_DIR = join(ROOT, 'premium');
 
 const STACK_DETECT = [
   { file: 'next.config.js', config: 'nextjs-typescript' },
@@ -16,87 +15,315 @@ const STACK_DETECT = [
   { file: 'requirements.txt', deps: ['fastapi'], config: 'python-fastapi' },
   { file: 'pyproject.toml', deps: ['fastapi'], config: 'python-fastapi' },
   { file: 'package.json', deps: ['next', 'react'], config: 'nextjs-typescript' },
+  { file: 'package.json', deps: ['express'], config: 'node-express' },
   { file: 'package.json', config: 'node-express' },
   { file: 'tsconfig.json', config: 'node-express' },
   { file: 'index.js', config: 'node-express' },
   { file: 'index.ts', config: 'node-express' },
+  { file: 'main.go', config: 'go' },
+  { file: 'app/main.py', config: 'python-fastapi' },
+  { file: 'Cargo.toml', config: 'rust' },
+  { file: 'Gemfile', config: 'ruby' },
 ];
 
-const HELP = `aicfg — one command to make AI coding agents follow your rules
+const HELP = `aicfg — AGENTS.md ecosystem tool. One command to manage AI agent configuration.
 
 Usage:
-  aicfg init                        Generate optimal AI agent config for this project
-  aicfg pack                        Bundle codebase context for AI (filtered, token-aware)
-  aicfg check                       Audit existing AI agent config for completeness
-  aicfg pro                         View premium stacks and pricing
-  aicfg pro --unlock <stack> --tx <hash>  Verify payment and install premium stack
+  aicfg init [stack]          Generate AGENTS.md + tool-specific shims for this project
+  aicfg shim                  Generate shim files from existing AGENTS.md
+  aicfg validate              Validate AGENTS.md against best practices
+  aicfg check                 Audit all AI agent config files for completeness
+  aicfg pack                  Bundle codebase context for AI consumption
 
 Examples:
-  npx aicfg init                              # Auto-detect stack, generate config
-  npx aicfg pro                               # View premium catalog with pricing
-  npx aicfg pro --unlock monorepo --tx 0x...  # Pay 10 USDC, then install monorepo stack
+  npx aicfg init                           # Auto-detect stack, generate AGENTS.md + shims
+  npx aicfg init go                        # Generate for Go projects
+  npx aicfg init --no-shims                # Only AGENTS.md, skip shim files
+  npx aicfg shim                           # Create CLAUDE.md, .cursorrules, GEMINI.md shims
+  npx aicfg validate                       # Check your AGENTS.md quality
+
+AGENTS.md is the open standard for AI agent configuration, stewarded by the Linux Foundation.
+Supported by 20+ AI coding tools: Claude Code, Cursor, Copilot, Codex, Gemini CLI, Windsurf, and more.
 
 Install: npm install -g github:ipythoning/aicfg
-GitHub:   https://github.com/ipythoning/aicfg`;
+GitHub:   https://github.com/ipythoning/aicfg
+Docs:     https://agents.md`;
 
-const PRO_PRICE_USDC = 10;
-const PRO_WALLET = '0x6024AB6263AB33150C4Ab83E74733AD42fdD71C4';
-const PRO_USDC_ADDRESS = '0xaf88d065e77c8cC2239327C5EDb3A432268e5831';
-const PRO_RPC = 'https://arb1.arbitrum.io/rpc';
-
-const USDC_TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
-
-const PREMIUM_STACKS = [
-  { name: 'monorepo', description: 'Multi-package monorepo with shared config (Turborepo/Nx)' },
-  { name: 'microservices', description: 'Multi-service architecture with service-level rules' },
-  { name: 'fullstack-nextjs', description: 'Next.js + API routes + DB + Auth complete stack' },
-  { name: 'enterprise-python', description: 'FastAPI + SQLAlchemy + Alembic + Redis + Docker' },
-  { name: 'team-sharing', description: 'Shared config repo for consistent rules across teams' },
-  { name: 'ci-cd-integration', description: 'Automatic config compliance checks in PRs' },
+// AGENTS.md quality checks — based on the AGENTS.md spec and empirical research
+const AGENTS_CHECKS = [
+  ['Has project overview (stack, structure)', /(?:overview|概述|project|stack|structure|架构)/i, 'Add a section describing the tech stack and project layout'],
+  ['Has build & test commands', /(?:npm run|pnpm |yarn |cargo |go build|uv run|pip |make |poetry)/i, 'Include exact build and test commands with flags'],
+  ['Has coding style rules', /(?:coding.style|code.style|编码风格|naming|naming convention|prettier|eslint|format)/i, 'Define code style rules that differ from language defaults'],
+  ['Has scope/boundaries', /(?:boundar|scope|do not|never|don\'t|avoid|forbidden|limit)/i, 'Define file/operation boundaries the agent must respect'],
+  ['Has error handling rules', /(?:error.handling|错误处理|catch|throw|reject|panic)/i, 'Include error handling conventions'],
+  ['Has testing instructions', /(?:test|测试|coverage|覆盖率|mock|fixture|assert)/i, 'Document testing approach, runner, and coverage targets'],
+  ['Has security rules', /(?:security|安全|secret|API.key|hardcod|auth|token|vulnerab)/i, 'Include security guidelines for secrets, auth, and input validation'],
+  ['Has git/PR workflow', /(?:git|commit|提交|PR|pull.request|branch|rebase)/i, 'Define git workflow, commit conventions, and PR requirements'],
+  ['Length > 500 chars (meaningful detail)', /[\s\S]{500}/, 'AGENTS.md is too short — add more substance. Target 50-200 lines'],
 ];
+
+// Tool-specific shim templates
+const SHIMS = {
+  'CLAUDE.md': `# CLAUDE.md
+<!-- This is a shim. All agent instructions live in AGENTS.md -->
+Read and follow all instructions in [AGENTS.md](./AGENTS.md).
+`,
+  '.cursorrules': `# .cursorrules
+# Shim — all instructions live in AGENTS.md
+Read and follow all instructions in AGENTS.md.
+`,
+  'GEMINI.md': `# GEMINI.md
+<!-- Shim — all instructions live in AGENTS.md -->
+Read and follow all instructions in [AGENTS.md](./AGENTS.md).
+`,
+  'copilot-instructions.md': `# Copilot Instructions
+<!-- Shim — all instructions live in AGENTS.md -->
+Read and follow all instructions in AGENTS.md.
+`,
+};
 
 async function main() {
   const cmd = process.argv[2];
   switch (cmd) {
     case 'init': return await initCmd();
-    case 'pack': return await packCmd();
+    case 'shim': return await shimCmd();
+    case 'validate': return await validateCmd();
     case 'check': return await checkCmd();
-    case 'pro': return await proCmd();
+    case 'pack': return await packCmd();
     case '--help': case '-h': case undefined: console.log(HELP); break;
-    case '--version': case '-v': console.log('aicfg v0.3.0'); break;
+    case '--version': case '-v': console.log('aicfg v0.4.0'); break;
     default: console.error(`Unknown command: ${cmd}\nRun aicfg --help`); process.exit(1);
   }
 }
 
+// === init — Auto-detect stack, generate AGENTS.md + shims ===
+
 async function initCmd() {
   const cwd = process.cwd();
-  const stack = await detectStack(cwd);
+  const stack = process.argv[3] && !process.argv[3].startsWith('--')
+    ? process.argv[3]
+    : await detectStack(cwd);
+  const noShims = process.argv.includes('--no-shims');
 
   if (!stack) {
-    console.log('⚠ Could not auto-detect stack. Supported stacks:');
-    for (const t of await readdir(TEMPLATES)) {
+    console.log('⚠ Could not auto-detect stack. Available templates:');
+    for (const t of (await readdir(TEMPLATES)).sort()) {
       console.log(`  - ${t}`);
     }
-    console.log('\nTo generate a specific stack: npx aicfg init <stack>');
-    console.log('Available: ' + (await readdir(TEMPLATES)).join(', '));
+    console.log('\nTo pick a stack: npx aicfg init <stack>');
     process.exit(0);
+  }
+
+  const templateDir = join(TEMPLATES, stack);
+  if (!(await fileExists(templateDir))) {
+    console.error(`Template "${stack}" not found.`);
+    console.error('Available: ' + (await readdir(TEMPLATES)).sort().join(', '));
+    process.exit(1);
   }
 
   console.log(`✓ Detected stack: ${stack}`);
 
-  const templateDir = join(TEMPLATES, stack);
-  const files = await copyDir(templateDir, cwd);
+  // Copy template AGENTS.md if it exists, or generate from CLAUDE.md
+  const agentsTemplate = join(templateDir, 'AGENTS.md');
+  const claudeTemplate = join(templateDir, 'CLAUDE.md');
 
-  console.log(`✓ Generated ${files.length} config files:`);
-  for (const f of files) console.log(`  - ${f}`);
-
-  if (await fileExists(join(cwd, 'bin', 'aicfg.js'))) {
-    console.log('\n🐕 Eating our own dog food — aicfg configured itself!');
+  if (await fileExists(agentsTemplate)) {
+    await copyIfNotExists(agentsTemplate, join(cwd, 'AGENTS.md'));
+    console.log('  ✓ AGENTS.md (primary agent config)');
+  } else if (await fileExists(claudeTemplate)) {
+    // Backward compat: use CLAUDE.md as AGENTS.md
+    let content = await readFile(claudeTemplate, 'utf-8');
+    content = content.replace(/^# CLAUDE\.md/m, '# AGENTS.md');
+    content = content.replace(/CLAUDE\.md/g, 'AGENTS.md');
+    await writeIfNotExists(join(cwd, 'AGENTS.md'), content);
+    console.log('  ✓ AGENTS.md (primary agent config)');
   }
 
-  console.log('\nNext: review the generated files, customize as needed.');
-  console.log('Run aicfg check to audit the config.');
+  // Generate shim files
+  if (!noShims) {
+    for (const [filename, content] of Object.entries(SHIMS)) {
+      const targetPath = filename === 'copilot-instructions.md'
+        ? join(cwd, '.github', filename)
+        : join(cwd, filename);
+      if (filename === 'copilot-instructions.md') {
+        await mkdir(join(cwd, '.github'), { recursive: true });
+      }
+      await writeIfNotExists(targetPath, content);
+    }
+
+    console.log('  ✓ Shim files: CLAUDE.md, .cursorrules, GEMINI.md → all point to AGENTS.md');
+    console.log('  ✓ .github/copilot-instructions.md');
+  }
+
+  // Also check if template has other files (README.md etc.)
+  for (const entry of await readdir(templateDir, { withFileTypes: true })) {
+    if (entry.isDirectory()) continue;
+    if (['AGENTS.md', 'CLAUDE.md', '.cursorrules', 'GEMINI.md'].includes(entry.name)) continue;
+    await copyIfNotExists(join(templateDir, entry.name), join(cwd, entry.name));
+  }
+
+  console.log('\n📖 AGENTS.md is the open standard for AI agent configuration.');
+  console.log('   Supported by 20+ AI coding tools. Edit AGENTS.md as your single source of truth.');
+  console.log('   Shim files (CLAUDE.md, .cursorrules, GEMINI.md) point to AGENTS.md — never edit them directly.');
+  console.log('\n   Run "aicfg validate" to check your AGENTS.md quality.');
+  console.log('   Run "aicfg check" for a full config audit.');
 }
+
+// === shim — Generate shim files from existing AGENTS.md ===
+
+async function shimCmd() {
+  const cwd = process.cwd();
+  const agentsPath = join(cwd, 'AGENTS.md');
+
+  if (!(await fileExists(agentsPath))) {
+    console.error('✗ No AGENTS.md found in current directory.');
+    console.error('  Run "aicfg init" first, or create AGENTS.md manually.');
+    process.exit(1);
+  }
+
+  let created = 0, skipped = 0;
+  for (const [filename, content] of Object.entries(SHIMS)) {
+    const targetPath = filename === 'copilot-instructions.md'
+      ? join(cwd, '.github', filename)
+      : join(cwd, filename);
+    if (filename === 'copilot-instructions.md') {
+      await mkdir(join(cwd, '.github'), { recursive: true });
+    }
+    if (await fileExists(targetPath)) {
+      skipped++;
+    } else {
+      await writeFile(targetPath, content);
+      created++;
+      console.log(`  ✓ ${filename}`);
+    }
+  }
+
+  if (created > 0) {
+    console.log(`\n✓ Created ${created} shim file${created > 1 ? 's' : ''} (${skipped} already existed)`);
+    console.log('  All shims point to AGENTS.md — the single source of truth.');
+  } else {
+    console.log('  All shim files already exist.');
+  }
+}
+
+// === validate — Check AGENTS.md quality ===
+
+async function validateCmd() {
+  const cwd = process.cwd();
+  const agentsPath = join(cwd, 'AGENTS.md');
+
+  if (!(await fileExists(agentsPath))) {
+    console.error('✗ No AGENTS.md found.');
+    console.error('  Run "aicfg init" to generate one, or create AGENTS.md manually.');
+    process.exit(1);
+  }
+
+  const content = await readFile(agentsPath, 'utf-8');
+  const lines = content.split('\n').length;
+  const chars = content.length;
+
+  let pass = 0, fail = 0, warn = 0;
+
+  console.log(`AGENTS.md — ${lines} lines, ${chars.toLocaleString()} chars\n`);
+
+  for (const [name, pattern, advice] of AGENTS_CHECKS) {
+    if (pattern.test(content)) {
+      pass++;
+    } else {
+      fail++;
+      console.log(`  ✗ ${name}`);
+      console.log(`    → ${advice}`);
+    }
+  }
+
+  // Additional structural checks
+  if (!content.startsWith('# ')) {
+    warn++;
+    console.log('  ⚠ Missing h1 title — AGENTS.md should start with "# Project Name"');
+  }
+  if (lines > 400) {
+    warn++;
+    console.log(`  ⚠ AGENTS.md is very long (${lines} lines). Consider keeping it under 400 lines.`);
+    console.log('    → Agents have limited context windows. Be concise.');
+  }
+
+  console.log(`\n${'─'.repeat(50)}`);
+  console.log(`  ✓ ${pass} passed  ✗ ${fail} missing  ${warn > 0 ? '⚠ ' + warn + ' warnings' : ''}`);
+
+  if (fail === 0 && warn === 0) {
+    console.log('  🎉 AGENTS.md is in great shape!');
+  } else if (fail > 0) {
+    console.log(`\n  Fix the ${fail} issue${fail > 1 ? 's' : ''} above to improve agent behavior.`);
+    console.log('  Tip: each fix directly improves how AI agents work on this project.');
+  }
+}
+
+// === check — Full config audit (AGENTS.md + shims) ===
+
+async function checkCmd() {
+  const cwd = process.cwd();
+  const issues = [];
+  const ok = [];
+
+  // Check AGENTS.md
+  const agents = join(cwd, 'AGENTS.md');
+  if (!(await fileExists(agents))) {
+    issues.push('Missing AGENTS.md — run "aicfg init" to generate one');
+  } else {
+    ok.push('AGENTS.md exists');
+    const content = await readFile(agents, 'utf-8');
+
+    if (content.length < 500) {
+      issues.push('AGENTS.md is very short (<500 chars). Add more substance.');
+    }
+    if (content.length > 20000) {
+      issues.push('AGENTS.md is very long (>20K chars). Agents have context limits — be concise.');
+    }
+
+    // Run all AGENTS_CHECKS
+    for (const [name, pattern] of AGENTS_CHECKS) {
+      if (pattern.test(content)) {
+        ok.push(`  ✓ ${name}`);
+      } else {
+        issues.push(`  ⚠ ${name}`);
+      }
+    }
+  }
+
+  // Check shim files
+  const shimFiles = ['CLAUDE.md', '.cursorrules', 'GEMINI.md'];
+  for (const f of shimFiles) {
+    if (await fileExists(join(cwd, f))) {
+      const shimContent = await readFile(join(cwd, f), 'utf-8');
+      if (shimContent.includes('AGENTS.md')) {
+        ok.push(`${f} → correctly points to AGENTS.md`);
+      } else {
+        issues.push(`${f} exists but does not reference AGENTS.md — may contain stale rules`);
+      }
+    } else {
+      issues.push(`Missing ${f} shim — run "aicfg shim" to generate`);
+    }
+  }
+
+  // Check Copilot instructions
+  const copilotPath = join(cwd, '.github', 'copilot-instructions.md');
+  if (await fileExists(copilotPath)) {
+    ok.push('.github/copilot-instructions.md exists');
+  }
+
+  console.log('✓ PASS:');
+  for (const o of ok) console.log(o);
+
+  if (issues.length > 0) {
+    console.log(`\n⚠ ISSUES (${issues.length}):`);
+    for (const i of issues) console.log(i);
+    console.log('\nRun "aicfg init" to fix missing files.');
+  } else {
+    console.log('\n🎉 All checks passed!');
+  }
+}
+
+// === pack — Bundle codebase context ===
 
 async function packCmd() {
   const cwd = process.cwd();
@@ -114,191 +341,21 @@ async function packCmd() {
       const ext = extname(f).slice(1) || 'txt';
       output += `## ${f}\n\`\`\`${ext}\n${content}\n\`\`\`\n\n`;
       totalChars += content.length;
-    } catch {
-      // skip binary/unreadable
-    }
+    } catch { /* skip binary/unreadable */ }
   }
 
   console.log(output);
   console.error(`✓ Packed ${files.length} files (~${Math.round(totalChars / 1000)}K chars)`);
 }
 
-async function checkCmd() {
-  const cwd = process.cwd();
-  const issues = [];
-  const ok = [];
-
-  const claudeMd = join(cwd, 'CLAUDE.md');
-  if (!(await fileExists(claudeMd))) {
-    issues.push('Missing CLAUDE.md — run aicfg init to generate one');
-  } else {
-    ok.push('CLAUDE.md exists');
-    const content = await readFile(claudeMd, 'utf-8');
-
-    const checks = [
-      ['Coding style rules', /coding.style|code.style|编码风格/i, 'no coding style rules defined'],
-      ['Error handling rules', /error.handling|错误处理/i, 'no error handling rules'],
-      ['Testing requirements', /test|测试|coverage|覆盖率/i, 'no testing requirements'],
-      ['Security rules', /security|安全|secret|API.key|hardcod/i, 'no security rules'],
-      ['Git workflow', /git|commit|提交|PR|pull.request/i, 'no git workflow rules'],
-      ['Project overview', /overview|概述|项目|#+\s*\w+/i, 'no project overview section'],
-    ];
-
-    for (const [name, pattern, warning] of checks) {
-      if (pattern.test(content)) {
-        ok.push(`  ✓ ${name}`);
-      } else {
-        issues.push(`  ⚠ ${warning}`);
-      }
-    }
-
-    if (content.length < 500) {
-      issues.push('CLAUDE.md is very short (<500 chars). Consider adding more detail.');
-    }
-  }
-
-  if (await fileExists(join(cwd, '.cursorrules'))) {
-    ok.push('.cursorrules exists');
-  }
-
-  if (await fileExists(join(cwd, '.github', 'copilot-instructions.md'))) {
-    ok.push('Copilot instructions exist');
-  }
-
-  console.log('✓ PASS:');
-  for (const o of ok) console.log(o);
-
-  if (issues.length > 0) {
-    console.log(`\n⚠ ISSUES (${issues.length}):`);
-    for (const i of issues) console.log(i);
-    console.log('\nRun aicfg init to fix.');
-  } else {
-    console.log('\n🎉 All checks passed!');
-  }
-}
-
-// === Premium (Pro) Commands ===
-
-async function proCmd() {
-  const args = process.argv.slice(3);
-  const unlockIdx = args.indexOf('--unlock');
-  const txIdx = args.indexOf('--tx');
-
-  if (unlockIdx !== -1 && txIdx !== -1) {
-    const stackName = args[unlockIdx + 1];
-    const txHash = args[txIdx + 1];
-    if (!stackName || !txHash) {
-      console.error('Usage: aicfg pro --unlock <stack-name> --tx <transaction-hash>');
-      console.error('Available stacks: ' + PREMIUM_STACKS.map(s => s.name).join(', '));
-      process.exit(1);
-    }
-    return await unlockPremium(stackName, txHash);
-  }
-
-  // Show premium catalog
-  console.log('🔐 aicfg Pro — Premium Config Stacks\n');
-  console.log(`Price: ${PRO_PRICE_USDC} USDC per stack (Arbitrum network)\n`);
-  console.log('Available stacks:\n');
-  for (const s of PREMIUM_STACKS) {
-    console.log(`  ${s.name.padEnd(24)} ${s.description}`);
-  }
-  console.log(`\nTo purchase and install a stack:`);
-  console.log(`  1. Send exactly ${PRO_PRICE_USDC} USDC to:`);
-  console.log(`     ${PRO_WALLET}`);
-  console.log(`  2. Copy the transaction hash from your wallet`);
-  console.log(`  3. Run: aicfg pro --unlock <stack> --tx <transaction-hash>`);
-  console.log(`\n  Example: aicfg pro --unlock monorepo --tx 0xabc123...`);
-  console.log(`\nNetwork: Arbitrum (USDC: ${PRO_USDC_ADDRESS})`);
-  console.log(`Explorer: https://arbiscan.io/address/${PRO_WALLET}`);
-}
-
-async function unlockPremium(stackName, txHash) {
-  const stack = PREMIUM_STACKS.find(s => s.name === stackName);
-  if (!stack) {
-    console.error(`Unknown stack: ${stackName}`);
-    console.error('Available: ' + PREMIUM_STACKS.map(s => s.name).join(', '));
-    process.exit(1);
-  }
-
-  const premiumPath = join(PREMIUM_DIR, stackName);
-  if (!(await fileExists(premiumPath))) {
-    console.error(`Stack "${stackName}" is not yet available locally.`);
-    console.error('Make sure you have the latest version: npm install -g github:ipythoning/aicfg');
-    process.exit(1);
-  }
-
-  console.log(`Verifying transaction ${txHash.slice(0, 10)}...`);
-
-  try {
-    const verified = await verifyUsdcPayment(txHash, PRO_PRICE_USDC);
-    if (verified) {
-      console.log('✓ Payment verified! Installing premium stack...\n');
-
-      const cwd = process.cwd();
-      const files = await copyDir(premiumPath, cwd);
-
-      console.log(`✓ Installed "${stackName}" premium stack (${files.length} files):`);
-      for (const f of files) console.log(`  - ${f}`);
-
-      console.log(`\n💡 Review the generated CLAUDE.md and .cursorrules.`);
-      console.log(`   Run "aicfg check" to audit the config.`);
-    } else {
-      console.log('✗ Payment not found. Please check:');
-      console.log('  1. Transaction hash is correct');
-      console.log('  2. Amount is exactly 10 USDC');
-      console.log('  3. Transaction is confirmed on Arbitrum');
-      console.log(`  4. Check on Arbiscan: https://arbiscan.io/tx/${txHash}`);
-    }
-  } catch (err) {
-    console.error('Verification error:', err.message);
-    console.log('Try again in a few seconds — the transaction may still be confirming.');
-  }
-}
-
-async function verifyUsdcPayment(txHash, minAmount) {
-  const resp = await fetch(PRO_RPC, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'eth_getTransactionReceipt',
-      params: [txHash],
-    }),
-  });
-
-  const data = await resp.json();
-  if (!data.result) return false;
-
-  const receipt = data.result;
-  if (receipt.status !== '0x1') return false;
-
-  const paddedWallet = '0x' + PRO_WALLET.slice(2).toLowerCase().padStart(64, '0');
-  for (const log of receipt.logs) {
-    if (log.address.toLowerCase() !== PRO_USDC_ADDRESS.toLowerCase()) continue;
-    if (log.topics[0] !== USDC_TRANSFER_TOPIC) continue;
-    if (log.topics[2] && log.topics[2].toLowerCase() === paddedWallet.toLowerCase()) {
-      const value = BigInt(log.data);
-      const minWei = BigInt(Math.floor(minAmount * 1e6));
-      return value >= minWei;
-    }
-  }
-
-  return false;
-}
-
 // === Shared Utilities ===
 
 async function detectStack(cwd) {
-  const arg = process.argv[3];
-  if (arg && await fileExists(join(TEMPLATES, arg))) return arg;
-
   for (const { file, deps, config } of STACK_DETECT) {
     if (!(await fileExists(join(cwd, file)))) continue;
     if (!deps || deps.length === 0) return config;
     try {
-      const isJson = file.endsWith('.json');
-      if (isJson) {
+      if (file.endsWith('.json')) {
         const content = JSON.parse(await readFile(join(cwd, file), 'utf-8'));
         const allDeps = { ...content.dependencies, ...content.devDependencies };
         if (deps.some(d => allDeps[d])) return config;
@@ -306,30 +363,25 @@ async function detectStack(cwd) {
         const content = await readFile(join(cwd, file), 'utf-8');
         if (deps.some(d => content.includes(d))) return config;
       }
-    } catch { /* continue to next rule */ }
+    } catch { /* continue */ }
   }
-
   return null;
 }
 
-async function copyDir(src, dest) {
-  const created = [];
-  for (const entry of await readdir(src, { withFileTypes: true })) {
-    const srcPath = join(src, entry.name);
-    const destPath = join(dest, entry.name);
-    if (entry.isDirectory()) {
-      await mkdir(destPath, { recursive: true });
-      created.push(...(await copyDir(srcPath, destPath)));
-    } else {
-      if (!(await fileExists(destPath))) {
-        await copyFile(srcPath, destPath);
-        created.push(entry.name);
-      } else {
-        console.log(`  ⚠ ${entry.name} already exists, skipping`);
-      }
-    }
+async function copyIfNotExists(src, dest) {
+  if (await fileExists(dest)) {
+    console.log(`  ⚠ ${basename(dest)} already exists, skipping`);
+    return;
   }
-  return created;
+  await copyFile(src, dest);
+}
+
+async function writeIfNotExists(path, content) {
+  if (await fileExists(path)) {
+    console.log(`  ⚠ ${basename(path)} already exists, skipping`);
+    return;
+  }
+  await writeFile(path, content);
 }
 
 async function loadGitignore(cwd) {

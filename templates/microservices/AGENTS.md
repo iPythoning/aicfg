@@ -1,4 +1,4 @@
-# CLAUDE.md — Microservices Architecture
+# AGENTS.md — Microservices Architecture
 
 ## Architecture
 

@@ -1,4 +1,4 @@
-# CLAUDE.md — Enterprise Python Backend
+# AGENTS.md — Enterprise Python Backend
 
 ## Stack
 - **Language**: Python 3.12+

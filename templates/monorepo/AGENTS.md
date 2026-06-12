@@ -1,4 +1,4 @@
-# CLAUDE.md — Monorepo (Turborepo)
+# AGENTS.md — Monorepo (Turborepo)
 
 ## Repository Structure
 

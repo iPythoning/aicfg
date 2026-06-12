@@ -1,4 +1,4 @@
-# CLAUDE.md — CI/CD Config Compliance
+# AGENTS.md — CI/CD Config Compliance
 
 ## Overview
 

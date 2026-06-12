@@ -1,7 +1,7 @@
 {
   "name": "aicfg",
-  "version": "0.3.0",
-  "description": "One command to make AI coding agents follow your rules",
+  "version": "0.4.0",
+  "description": "AGENTS.md ecosystem tool — manage AI agent configuration across 20+ coding tools",
   "type": "module",
   "bin": {
     "aicfg": "./bin/aicfg.js"
@@ -9,17 +9,18 @@
   "files": [
     "bin/",
     "templates/",
-    "premium/",
     "README.md",
     "LICENSE"
   ],
   "keywords": [
+    "agents.md",
     "ai",
     "claude-code",
     "cursor",
     "copilot",
-    "config",
-    "claude",
+    "codex",
+    "gemini-cli",
+    "agent-config",
     "coding-standards",
     "developer-tools",
     "cli"

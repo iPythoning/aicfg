@@ -1,4 +1,4 @@
-# CLAUDE.md — Fullstack Next.js App
+# AGENTS.md — Fullstack Next.js App
 
 ## Stack
 - **Framework**: Next.js 15 (App Router)
