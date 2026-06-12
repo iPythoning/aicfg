@@ -2,9 +2,6 @@
 import { readdir, readFile, writeFile, mkdir, access, copyFile, stat } from 'node:fs/promises';
 import { join, dirname, relative, basename, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createReadStream } from 'node:fs';
-import { createInterface } from 'node:readline';
-import { execSync } from 'node:child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATES = join(__dirname, '..', 'templates');
@@ -17,7 +14,6 @@ const STACK_DETECT = [
   { file: 'requirements.txt', deps: ['fastapi'], config: 'python-fastapi' },
   { file: 'pyproject.toml', deps: ['fastapi'], config: 'python-fastapi' },
   { file: 'package.json', deps: ['next', 'react'], config: 'nextjs-typescript' },
-  // Generic fallbacks last
   { file: 'package.json', config: 'node-express' },
   { file: 'tsconfig.json', config: 'node-express' },
   { file: 'index.js', config: 'node-express' },
@@ -30,14 +26,33 @@ Usage:
   aicfg init     Generate optimal AI agent config for this project
   aicfg pack     Bundle codebase context for AI (filtered, token-aware)
   aicfg check    Audit existing AI agent config for completeness
+  aicfg pro      Premium config stacks — pay with USDC
 
 Examples:
-  npx aicfg init          # Auto-detect stack, generate config
-  npx aicfg pack > ctx    # Save context to file
-  npx aicfg check         # Check CLAUDE.md quality
+  npx aicfg init              # Auto-detect stack, generate config
+  npx aicfg pack > ctx        # Save context to file
+  npx aicfg check             # Check CLAUDE.md quality
+  npx aicfg pro               # View premium stacks & pricing
+  npx aicfg pro --claim 0x... # Verify payment, unlock premium
 
-aicfg Pro: premium config stacks, team sharing, CI/CD integration
-  Learn more: https://github.com/ipythoning/aicfg#pro`;
+Install: npm install -g github:ipythoning/aicfg
+GitHub:   https://github.com/ipythoning/aicfg`;
+
+const PRO_PRICE_USDC = 10;
+const PRO_WALLET = '0x6024AB6263AB33150C4Ab83E74733AD42fdD71C4';
+const PRO_USDC_ADDRESS = '0xaf88d065e77c8cC2239327C5EDb3A432268e5831';
+const PRO_RPC = 'https://arb1.arbitrum.io/rpc';
+
+const USDC_TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+
+const PREMIUM_STACKS = [
+  { name: 'monorepo', description: 'Multi-package monorepo with shared config (Turborepo/Nx)' },
+  { name: 'microservices', description: 'Multi-service architecture with service-level rules' },
+  { name: 'fullstack-nextjs', description: 'Next.js + API routes + DB + Auth complete stack' },
+  { name: 'enterprise-python', description: 'FastAPI + SQLAlchemy + Alembic + Redis + Docker' },
+  { name: 'team-sharing', description: 'Shared config repo for consistent rules across teams' },
+  { name: 'ci-cd-integration', description: 'Automatic config compliance checks in PRs' },
+];
 
 async function main() {
   const cmd = process.argv[2];
@@ -45,6 +60,7 @@ async function main() {
     case 'init': return await initCmd();
     case 'pack': return await packCmd();
     case 'check': return await checkCmd();
+    case 'pro': return await proCmd();
     case '--help': case '-h': case undefined: console.log(HELP); break;
     case '--version': case '-v': console.log('aicfg v0.1.0'); break;
     default: console.error(`Unknown command: ${cmd}\nRun aicfg --help`); process.exit(1);
@@ -73,7 +89,6 @@ async function initCmd() {
   console.log(`✓ Generated ${files.length} config files:`);
   for (const f of files) console.log(`  - ${f}`);
 
-  // Bootstrap: if running in aicfg's own project, note the self-hosting
   if (await fileExists(join(cwd, 'bin', 'aicfg.js'))) {
     console.log('\n🐕 Eating our own dog food — aicfg configured itself!');
   }
@@ -112,7 +127,6 @@ async function checkCmd() {
   const issues = [];
   const ok = [];
 
-  // Check CLAUDE.md
   const claudeMd = join(cwd, 'CLAUDE.md');
   if (!(await fileExists(claudeMd))) {
     issues.push('Missing CLAUDE.md — run aicfg init to generate one');
@@ -142,12 +156,10 @@ async function checkCmd() {
     }
   }
 
-  // Check .cursorrules
   if (await fileExists(join(cwd, '.cursorrules'))) {
     ok.push('.cursorrules exists');
   }
 
-  // Check .github/copilot-instructions.md
   if (await fileExists(join(cwd, '.github', 'copilot-instructions.md'))) {
     ok.push('Copilot instructions exist');
   }
@@ -164,17 +176,103 @@ async function checkCmd() {
   }
 }
 
+async function proCmd() {
+  const arg = process.argv[3];
+
+  if (arg === '--claim') {
+    const txHash = process.argv[4];
+    if (!txHash) {
+      console.error('Usage: aicfg pro --claim <transaction-hash>');
+      console.error('Send USDC first, then verify with your transaction hash.');
+      process.exit(1);
+    }
+    return await claimPremium(txHash);
+  }
+
+  // Show premium catalog
+  console.log('🔐 aicfg Pro — Premium Config Stacks\n');
+  console.log(`Price: ${PRO_PRICE_USDC} USDC per stack (Arbitrum network)\n`);
+  console.log('Available stacks:\n');
+  for (const s of PREMIUM_STACKS) {
+    console.log(`  ${s.name.padEnd(24)} ${s.description}`);
+  }
+  console.log(`\nTo purchase:`);
+  console.log(`  1. Send exactly ${PRO_PRICE_USDC} USDC to:`);
+  console.log(`     ${PRO_WALLET}`);
+  console.log(`  2. Copy the transaction hash from your wallet`);
+  console.log(`  3. Run: aicfg pro --claim <transaction-hash>`);
+  console.log(`\nNetwork: Arbitrum (USDC: ${PRO_USDC_ADDRESS})`);
+  console.log(`Explorer: https://arbiscan.io/address/${PRO_WALLET}`);
+}
+
+async function claimPremium(txHash) {
+  console.log(`Verifying transaction ${txHash.slice(0, 10)}...`);
+
+  try {
+    const verified = await verifyUsdcPayment(txHash, PRO_PRICE_USDC);
+    if (verified) {
+      console.log('✓ Payment verified! Unlocking premium stacks...\n');
+      console.log('Download links (valid for this session):\n');
+      for (const s of PREMIUM_STACKS) {
+        console.log(`  ${s.name.padEnd(24)} https://github.com/ipythoning/aicfg-pro/releases/latest/download/${s.name}.zip`);
+      }
+      console.log('\n💡 Premium stacks are shipped as zip archives.');
+      console.log('   Extract into your project and run aicfg init to apply.');
+    } else {
+      console.log('✗ Payment not found. Please check:');
+      console.log('  1. Transaction hash is correct');
+      console.log('  2. Amount is exactly 10 USDC');
+      console.log('  3. Transaction is confirmed on Arbitrum');
+      console.log(`  4. Check on Arbiscan: https://arbiscan.io/tx/${txHash}`);
+    }
+  } catch (err) {
+    console.error('Verification error:', err.message);
+    console.log('Try again in a few seconds — the transaction may still be confirming.');
+  }
+}
+
+async function verifyUsdcPayment(txHash, minAmount) {
+  // Fetch transaction receipt to verify it's a USDC transfer to our wallet
+  const resp = await fetch(PRO_RPC, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'eth_getTransactionReceipt',
+      params: [txHash],
+    }),
+  });
+
+  const data = await resp.json();
+  if (!data.result) return false;
+
+  const receipt = data.result;
+  if (receipt.status !== '0x1') return false; // transaction failed
+
+  // Check logs for USDC Transfer event to our wallet
+  const paddedWallet = '0x' + PRO_WALLET.slice(2).toLowerCase().padStart(64, '0');
+  for (const log of receipt.logs) {
+    if (log.address.toLowerCase() !== PRO_USDC_ADDRESS.toLowerCase()) continue;
+    if (log.topics[0] !== USDC_TRANSFER_TOPIC) continue;
+    // topics[2] is the recipient (destination address in Transfer event)
+    if (log.topics[2] && log.topics[2].toLowerCase() === paddedWallet.toLowerCase()) {
+      const value = BigInt(log.data);
+      const minWei = BigInt(Math.floor(minAmount * 1e6)); // USDC has 6 decimals
+      return value >= minWei;
+    }
+  }
+
+  return false;
+}
+
 async function detectStack(cwd) {
   const arg = process.argv[3];
   if (arg && await fileExists(join(TEMPLATES, arg))) return arg;
 
   for (const { file, deps, config } of STACK_DETECT) {
     if (!(await fileExists(join(cwd, file)))) continue;
-
-    // If no deps specified, it's a simple file check (e.g. go.mod, package.json fallback)
     if (!deps || deps.length === 0) return config;
-
-    // Check if specific dependencies exist in the file
     try {
       const isJson = file.endsWith('.json');
       if (isJson) {

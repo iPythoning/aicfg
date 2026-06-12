@@ -3,9 +3,15 @@
 **One command to make AI coding agents follow your rules.**
 
 ```bash
-npx aicfg init     # Auto-detect stack, generate optimal AI agent config
-npx aicfg pack     # Bundle codebase context for AI
-npx aicfg check    # Audit existing AI agent config
+# Install (choose one):
+npm install -g github:ipythoning/aicfg    # GitHub (always works)
+npx aicfg init                            # No install needed
+
+# Use:
+aicfg init     # Auto-detect stack, generate optimal AI agent config
+aicfg pack     # Bundle codebase context for AI
+aicfg check    # Audit existing AI agent config
+aicfg pro      # Premium config stacks (USDC payment)
 ```
 
 ## The Problem
@@ -67,13 +73,25 @@ aicfg check
 
 ## aicfg Pro
 
-Free tier covers 4 stacks with basic rules. Pro unlocks:
+Free tier covers 4 stacks with basic rules. Pro unlocks 6 premium stacks:
 
-- **Enterprise stacks**: monorepo, microservices, multi-language projects
-- **Team sharing**: shared config repository for consistent rules across the team
-- **CI/CD integration**: automatic config compliance checks in pull requests
+| Stack | What You Get |
+|-------|-------------|
+| `monorepo` | Turborepo/Nx multi-package shared config |
+| `microservices` | Service-level rules, shared contracts |
+| `fullstack-nextjs` | Next.js + API routes + DB + Auth |
+| `enterprise-python` | FastAPI + SQLAlchemy + Alembic + Redis + Docker |
+| `team-sharing` | Shared config repo for team consistency |
+| `ci-cd-integration` | Automated config compliance in PRs |
 
-[Learn more about aicfg Pro →](https://github.com/ipythoning/aicfg#pro)
+**Price: 10 USDC per stack** (Arbitrum network)
+
+```bash
+aicfg pro                    # View catalog & payment address
+aicfg pro --claim 0x...      # Verify payment, unlock downloads
+```
+
+No signup. No API keys. No email. Just send USDC and verify on-chain.
 
 ## Self-Hosting
 
