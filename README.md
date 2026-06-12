@@ -87,9 +87,11 @@ Free tier covers 4 stacks with basic rules. Pro unlocks 6 premium stacks:
 **Price: 10 USDC per stack** (Arbitrum network)
 
 ```bash
-aicfg pro                    # View catalog & payment address
-aicfg pro --claim 0x...      # Verify payment, unlock downloads
+aicfg pro                                              # View catalog & payment address
+aicfg pro --unlock monorepo --tx 0x...                 # Verify on-chain payment, install locally
 ```
+
+No signup. No API keys. No email. Just send USDC, verify on-chain, and the premium config is extracted directly to your project.
 
 No signup. No API keys. No email. Just send USDC and verify on-chain.
 
