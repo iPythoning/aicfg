@@ -37,7 +37,7 @@ jobs:
           test -f .cursorrules || (echo "Missing .cursorrules" && exit 1)
       
       - name: Run aicfg check
-        run: npx aicfg check
+        run: npx github:ipythoning/aicfg check
         
       - name: Scan for config violations
         run: |
@@ -52,7 +52,7 @@ jobs:
 ```bash
 #!/bin/sh
 echo "Running config compliance check..."
-npx aicfg check
+npx github:ipythoning/aicfg check
 npx eslint --fix --quiet .
 npx prettier --check .
 ```

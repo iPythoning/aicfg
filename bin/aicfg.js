@@ -36,16 +36,17 @@ Usage:
   aicfg pack                  Bundle codebase context for AI consumption
 
 Examples:
-  npx aicfg init                           # Auto-detect stack, generate AGENTS.md + shims
-  npx aicfg init go                        # Generate for Go projects
-  npx aicfg init --no-shims                # Only AGENTS.md, skip shim files
-  npx aicfg shim                           # Create CLAUDE.md, .cursorrules, GEMINI.md shims
-  npx aicfg validate                       # Check your AGENTS.md quality
+  aicfg init                               # Auto-detect stack, generate AGENTS.md + shims
+  aicfg init go                            # Generate for Go projects
+  aicfg init --no-shims                    # Only AGENTS.md, skip shim files
+  aicfg shim                               # Create CLAUDE.md, .cursorrules, GEMINI.md shims
+  aicfg validate                           # Check your AGENTS.md quality
 
 AGENTS.md is the open standard for AI agent configuration, stewarded by the Linux Foundation.
 Supported by 20+ AI coding tools: Claude Code, Cursor, Copilot, Codex, Gemini CLI, Windsurf, and more.
 
-Install: npm install -g github:ipythoning/aicfg
+Run without install: npx github:ipythoning/aicfg init
+Install globally:     npm install -g github:ipythoning/aicfg
 GitHub:   https://github.com/ipythoning/aicfg
 Docs:     https://agents.md`;
 
@@ -110,7 +111,7 @@ async function initCmd() {
     for (const t of (await readdir(TEMPLATES)).sort()) {
       console.log(`  - ${t}`);
     }
-    console.log('\nTo pick a stack: npx aicfg init <stack>');
+    console.log('\nTo pick a stack: aicfg init <stack>');
     process.exit(0);
   }
 
