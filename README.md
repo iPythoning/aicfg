@@ -15,7 +15,21 @@ npx aicfg init                            # No install needed
 
 **The solution**: AGENTS.md as the **single source of truth**. Tool-specific files become 3-line shims that point to it. Edit once, apply everywhere.
 
-Research from Princeton shows AGENTS.md reduces agent runtime by 28.6% and token usage by 16.6%. 60,000+ GitHub repos already use it.
+A [Princeton study](https://arxiv.org/pdf/2509.23586) (OpenAI Codex across 10 repos / 124 merged PRs) measured a **28.6% median runtime reduction** and **16.6% median token reduction** when AGENTS.md is present — the agent skips exploring directory structure and guessing build/test commands. [60,000+ GitHub repos](https://agents.md) already ship one.
+
+## Before / After
+
+```
+Before                          After (aicfg init)
+──────                          ──────────────────
+CLAUDE.md      ← edit           AGENTS.md      ← edit ONLY this
+.cursorrules   ← edit           CLAUDE.md      → "Read AGENTS.md"
+GEMINI.md      ← edit           .cursorrules   → "Read AGENTS.md"
+copilot-…md    ← edit           GEMINI.md      → "Read AGENTS.md"
+   ↓                            copilot-…md    → "Read AGENTS.md"
+4 files drift out of sync          ↓
+                                1 source of truth, shims never go stale
+```
 
 ## Quick Start
 
@@ -23,7 +37,14 @@ Research from Princeton shows AGENTS.md reduces agent runtime by 28.6% and token
 npx aicfg init
 ```
 
-Detects your stack, generates AGENTS.md + shim files (CLAUDE.md, .cursorrules, GEMINI.md). 10 stacks supported.
+```text
+✓ Detected stack: node-express
+  ✓ AGENTS.md (primary agent config)
+  ✓ Shim files: CLAUDE.md, .cursorrules, GEMINI.md → all point to AGENTS.md
+  ✓ .github/copilot-instructions.md
+```
+
+Detects your stack, generates AGENTS.md + shim files (CLAUDE.md, .cursorrules, GEMINI.md). 10 stacks supported. Won't overwrite an existing AGENTS.md or README.
 
 ## Commands
 
