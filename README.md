@@ -7,6 +7,8 @@ npm install -g github:ipythoning/aicfg    # Install globally
 npx aicfg init                            # No install needed
 ```
 
+**▶ [Try it in your browser](https://ipythoning.github.io/aicfg/)** — pick your stack, preview the exact AGENTS.md + shim files, zero install.
+
 ## Why AGENTS.md?
 
 [AGENTS.md](https://agents.md) is the **open standard** for AI agent configuration, stewarded by the Linux Foundation. It's supported by Claude Code, Cursor, GitHub Copilot, OpenAI Codex, Gemini CLI, Windsurf, Devin, Aider, and 15+ other AI coding tools.
