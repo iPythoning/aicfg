@@ -279,8 +279,30 @@ async function main() {
   await writeFile(join(OUT_DIR, 'index.html'), page);
   // .nojekyll so GitHub Pages serves files starting with _ or . untouched
   await writeFile(join(OUT_DIR, '.nojekyll'), '');
+
+  // SEO: let search engines discover and index the playground URL.
+  const SITE = 'https://ipythoning.github.io/aicfg/';
+  const lastmod = new Date().toISOString().slice(0, 10);
+  await writeFile(join(OUT_DIR, 'sitemap.xml'),
+    `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${SITE}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>
+`);
+  await writeFile(join(OUT_DIR, 'robots.txt'),
+    `User-agent: *
+Allow: /
+Sitemap: ${SITE}sitemap.xml
+`);
+
   const bytes = Buffer.byteLength(page);
   console.log(`✓ web/index.html — ${count} stacks, ${(bytes / 1024).toFixed(1)} kB`);
+  console.log('✓ web/sitemap.xml + web/robots.txt');
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
