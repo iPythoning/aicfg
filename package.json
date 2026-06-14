@@ -4,7 +4,7 @@
   "description": "AGENTS.md ecosystem tool — manage AI agent configuration across 20+ coding tools",
   "type": "module",
   "bin": {
-    "aicfg": "./bin/aicfg.js"
+    "aicfg": "bin/aicfg.js"
   },
   "files": [
     "bin/",
@@ -29,7 +29,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ipythoning/aicfg"
+    "url": "git+https://github.com/ipythoning/aicfg.git"
   },
   "scripts": {
     "start": "node bin/aicfg.js"

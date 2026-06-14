@@ -3,8 +3,8 @@
 **Manage AI agent configuration across 20+ coding tools. One command.**
 
 ```bash
-npm install -g github:ipythoning/aicfg    # Install globally
-npx aicfg init                            # No install needed
+npx github:ipythoning/aicfg init          # No install needed
+npm install -g github:ipythoning/aicfg    # Or install globally
 ```
 
 **▶ [Try it in your browser](https://ipythoning.github.io/aicfg/)** — pick your stack, preview the exact AGENTS.md + shim files, zero install.
@@ -36,7 +36,7 @@ copilot-…md    ← edit           GEMINI.md      → "Read AGENTS.md"
 ## Quick Start
 
 ```bash
-npx aicfg init
+npx github:ipythoning/aicfg init
 ```
 
 ```text
