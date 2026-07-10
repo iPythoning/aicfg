@@ -141,3 +141,7 @@ aicfg configures itself using `aicfg init` — [check our AGENTS.md](AGENTS.md) 
 ## License
 
 MIT — free forever. AGENTS.md is the standard. Tooling around it should be free too.
+
+## Support
+
+[![Buy me a coffee](https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=&slug=dayongfan&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff)](https://buymeacoffee.com/dayongfan)
